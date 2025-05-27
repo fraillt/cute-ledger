@@ -53,6 +53,17 @@ impl Account {
     pub fn total_amount(&self) -> Decimal {
         self.available + self.held
     }
+    pub fn available(&self) -> Decimal {
+        self.available
+    }
+
+    pub fn held(&self) -> Decimal {
+        self.held
+    }
+
+    pub fn locked(&self) -> bool {
+        self.locked
+    }
 
     pub fn apply(&mut self, event: &AccountEvent) {
         match event.kind {
@@ -80,7 +91,7 @@ impl Account {
         }
     }
 
-    pub fn handle_new_transaction(
+    pub fn handle_create_transaction(
         &self,
         command: CreateTransactionCommand,
     ) -> Result<AccountEvent, AccountError> {
@@ -227,12 +238,12 @@ mod tests {
     }
 
     #[test]
-    fn handle_new_transaction() {
+    fn handle_create_transaction() {
         let mut acc = Account::default();
 
         // deposit
         let deposit_evt = acc
-            .handle_new_transaction(CreateTransactionCommand {
+            .handle_create_transaction(CreateTransactionCommand {
                 tx_id: 0,
                 action: CreateTransactionAction::Deposit,
                 amount: Decimal::from_u32(13).unwrap(),
@@ -248,19 +259,21 @@ mod tests {
             amount: Decimal::from_u32(5).unwrap(),
         };
         let err = acc
-            .handle_new_transaction(withdrawal_cmd.clone())
+            .handle_create_transaction(withdrawal_cmd.clone())
             .unwrap_err();
         assert!(matches!(err, AccountError::InsufficientFunds));
 
         // withdrawal after deposit applied
         acc.apply(&deposit_evt);
-        let withdrawal_evt = acc.handle_new_transaction(withdrawal_cmd.clone()).unwrap();
+        let withdrawal_evt = acc
+            .handle_create_transaction(withdrawal_cmd.clone())
+            .unwrap();
         assert_eq!(withdrawal_evt.amount, Decimal::from_u32(5).unwrap());
         assert!(matches!(withdrawal_evt.kind, AccountEventKind::Withdrawn));
 
         // account locked
         acc.locked = true;
-        let err = acc.handle_new_transaction(withdrawal_cmd).unwrap_err();
+        let err = acc.handle_create_transaction(withdrawal_cmd).unwrap_err();
         assert!(matches!(err, AccountError::AccountFrozen));
     }
 
